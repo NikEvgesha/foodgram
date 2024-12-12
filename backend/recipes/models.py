@@ -1,4 +1,6 @@
 from django.db import models
+from django.core.validators import MinValueValidator
+
 from users.models import User
 
 
@@ -24,11 +26,11 @@ class Ingredient(models.Model):
 class Tag(models.Model):
     name = models.CharField(
         'Название',
-        max_length=200
+        max_length=32
     )
     slug = models.SlugField(
         'Слаг',
-        max_length=200,
+        max_length=32,
         unique=True,
         null=True
     )
@@ -92,22 +94,28 @@ class RecipeIngredient(models.Model):
         on_delete=models.CASCADE,
         verbose_name='Ингредиент'
     )
-    amount = models.IntegerField()
+    amount = models.IntegerField(
+        verbose_name='',
+        validators=[MinValueValidator(1, 'Количество ингредиента не может быть меньше 1')]
+    )
 
 
 class Favorite(models.Model):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
+        related_name='favorites',
         verbose_name='Пользователь'
     )
     recipe = models.ForeignKey(
         Recipe,
         on_delete=models.CASCADE,
+        related_name='favorites',
         verbose_name='Рецепт'
     )
 
     class Meta:
+        verbose_name = 'Избранное'
         unique_together = ('user', 'recipe')
 
 
@@ -124,4 +132,5 @@ class Cart(models.Model):
     )
 
     class Meta:
+        verbose_name = 'Список покупок'
         unique_together = ('user', 'recipe')
