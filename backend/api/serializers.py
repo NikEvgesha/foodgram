@@ -1,6 +1,8 @@
 import base64
 
+from django.shortcuts import get_object_or_404
 from django.core.files.base import ContentFile
+from django.contrib.auth.tokens import default_token_generator
 from rest_framework import serializers
 from rest_framework.fields import SerializerMethodField
 
@@ -32,21 +34,36 @@ class UserDetailSerializer(serializers.ModelSerializer):
                   'last_name', 'is_subscribed', 'avatar')
 
     def get_is_subscribed(self, obj: User) -> bool:
-        current_user = self.context.get('request').user
-        if current_user.is_anonymous:
-            return False
+        # current_user = self.context.get('request').user
+        # if current_user.is_anonymous:
+        #     return False
         return False  #  Follow.objects.filter(user=current_user, author=obj).exists()
     
 
 class UserCreateSerializer(serializers.ModelSerializer):
-     class Meta:
+    class Meta:
         model = User
-        fields = ('id', 'email', 'username', 'first_name', 'last_name')
+        fields = ('id', 'email', 'username', 'first_name', 'last_name', 'password')
         extra_kwargs = {
             'password': {
+                'required' : True,
                 'write_only': True,
+                'allow_blank': False
             },
+            'first_name': {'required': True, 'allow_blank': False},
+            'last_name': {'required': True, 'allow_blank': False},
+            'username': {'required': True, 'allow_blank': False},
+            'email': {'required': True ,'allow_blank': False},
         }
+
+    def create(self, validated_data):
+        return User.objects.create_user(**validated_data)
+
+
+class UserTokenSerializer(serializers.Serializer):
+    class Meta:
+        model = User
+        fields = ('username', 'password')
 
 
 ''' Recipes app '''

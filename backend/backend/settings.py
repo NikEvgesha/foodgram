@@ -20,7 +20,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'django_filters',
-    #'djoser',
+    'djoser',
     'api.apps.ApiConfig',
     'recipes.apps.RecipesConfig',
     'users.apps.UsersConfig'
@@ -106,38 +106,25 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'users.User'
 
+AUTHENTICATION_BACKENDS = [
+    "djoser.auth_backends.LoginFieldBackend",
+]
 
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
     ],
 
-    # 'DEFAULT_AUTHENTICATION_CLASSES': (
-    #     'rest_framework.authentication.TokenAuthentication',
-    # ),
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.TokenAuthentication',
+    ),
 }
 
 
-# DJOSER = {
-#     'LOGIN_FIELD': 'email',
-#     'HIDE_USERS': False,
-#     'SERIALIZERS': {
-#         'user_create': (
-#             'api.serializers.user_serializers.'
-#             'UserProfileCreateSerializer'
-#         ),
-#         'user': (
-#             'api.serializers.user_serializers.'
-#             'UserProfileSerializer'
-#         ),
-#         'current_user': (
-#             'api.serializers.user_serializers.'
-#             'UserProfileSerializer'
-#         ),
-#     },
-
-#     'PERMISSIONS': {
-#         'user': ['djoser.permissions.CurrentUserOrAdminOrReadOnly'],
-#         'user_list': ['rest_framework.permissions.IsAuthenticatedOrReadOnly'],
-#     },
-# }
+DJOSER = {
+    'LOGIN_FIELD': 'email',
+    'SERIALIZERS': {
+        'user_create': 'api.serializers.UserCreateSerializer',
+        'user': 'api.serializers.UserDetailSerializer',
+    },
+}

@@ -1,6 +1,9 @@
-from rest_framework import filters, mixins, viewsets
-from rest_framework.permissions import AllowAny, SAFE_METHODS, IsAuthenticated
+from django.shortcuts import get_object_or_404
+from rest_framework import status, mixins, viewsets, generics
+from rest_framework.permissions import AllowAny, SAFE_METHODS, IsAuthenticated, IsAuthenticatedOrReadOnly
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 from recipes.models import Ingredient, Tag, Recipe
 from users.models import User, Follow
@@ -21,7 +24,7 @@ class UserDetailViewSet(mixins.CreateModelMixin,
                   viewsets.GenericViewSet):
     queryset = User.objects.all()
     serializer_class = UserDetailSerializer
-    permission_classes = (AllowAny,)
+    permission_classes = (AllowAny, )
     pagination_class = CustomPaginator
 
     def get_serializer_class(self):
@@ -29,7 +32,16 @@ class UserDetailViewSet(mixins.CreateModelMixin,
             return UserDetailSerializer
         return UserCreateSerializer
     
+    @action(detail=False, methods=['GET'],
+            permission_classes=(IsAuthenticated,))
+    def me(self, request):
+        serializer = UserDetailSerializer(request.user)
+        return Response(serializer.data,
+                        status=status.HTTP_200_OK)
+
     
+
+
 
 
 
