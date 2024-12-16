@@ -58,7 +58,8 @@ class User(AbstractUser):
     avatar = models.ImageField(
         'Аватар',
         upload_to='avatars/',
-        blank=True
+        blank=True,
+        null=True
     )
 
     objects = CustomUserManager()

@@ -46,6 +46,7 @@ class Tag(models.Model):
 class Recipe(models.Model):
     tags = models.ManyToManyField(
         Tag,
+        through='RecipeTag',
         verbose_name='Теги'
     )
     author = models.ForeignKey(
@@ -73,31 +74,59 @@ class Recipe(models.Model):
     )
     cooking_time = models.IntegerField(
         verbose_name='Время приготовления',
+        validators=[MinValueValidator(1, 'Время приготовления не может быть меньше 1')]
     )
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name = 'Рецепт'
         verbose_name_plural = 'Рецепты'
+        ordering = ('-created_at', 'name')
 
     def __str__(self):
         return self.name
+
+
+class RecipeTag(models.Model):
+    tag = models.ForeignKey(
+        Tag,
+        on_delete=models.CASCADE)
+    recipe = models.ForeignKey(
+        Recipe,
+        on_delete=models.CASCADE)
+
+    class Meta:
+        verbose_name = 'Тег рецепта'
+        verbose_name_plural = 'Теги рецепта'
+
 
 
 class RecipeIngredient(models.Model):
     recipe = models.ForeignKey(
         Recipe,
         on_delete=models.CASCADE,
+        related_name='recipe_ingredient',
         verbose_name='Рецепт'
     )
     ingredient = models.ForeignKey(
         Ingredient,
         on_delete=models.CASCADE,
+        related_name='recipe_ingredient',
         verbose_name='Ингредиент'
     )
     amount = models.IntegerField(
-        verbose_name='',
+        verbose_name='Количество',
         validators=[MinValueValidator(1, 'Количество ингредиента не может быть меньше 1')]
     )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['ingredient', 'recipe'], name='unique_ingredient'
+            )
+        ]
+        verbose_name = 'Ингредиент в рецепте'
+        verbose_name_plural = 'Ингредиенты в рецепте'
 
 
 class Favorite(models.Model):
@@ -134,3 +163,13 @@ class Cart(models.Model):
     class Meta:
         verbose_name = 'Список покупок'
         unique_together = ('user', 'recipe')
+
+
+class ShortURL(models.Model):
+    original_url = models.CharField(
+        max_length=255)
+    short_url = models.CharField(
+         max_length=255)
+
+    def __str__(self):
+        return self.short_url
