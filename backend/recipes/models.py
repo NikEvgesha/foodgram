@@ -1,6 +1,5 @@
-from django.db import models
 from django.core.validators import MinValueValidator
-
+from django.db import models
 from users.models import User
 
 
@@ -74,7 +73,9 @@ class Recipe(models.Model):
     )
     cooking_time = models.IntegerField(
         verbose_name='Время приготовления',
-        validators=[MinValueValidator(1, 'Время приготовления не может быть меньше 1')]
+        validators=[MinValueValidator(
+            1,
+            'Время приготовления не может быть меньше 1')]
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -100,7 +101,6 @@ class RecipeTag(models.Model):
         verbose_name_plural = 'Теги рецепта'
 
 
-
 class RecipeIngredient(models.Model):
     recipe = models.ForeignKey(
         Recipe,
@@ -116,7 +116,9 @@ class RecipeIngredient(models.Model):
     )
     amount = models.IntegerField(
         verbose_name='Количество',
-        validators=[MinValueValidator(1, 'Количество ингредиента не может быть меньше 1')]
+        validators=[MinValueValidator(
+            1,
+            'Количество ингредиента не может быть меньше 1')]
     )
 
     class Meta:
@@ -171,7 +173,7 @@ class ShortURL(models.Model):
     original_url = models.CharField(
         max_length=255)
     short_url = models.CharField(
-         max_length=255)
+        max_length=255)
 
     def __str__(self):
         return self.short_url

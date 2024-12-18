@@ -1,13 +1,13 @@
 import base64
 
-from django.shortcuts import get_object_or_404
-from django.core.files.base import ContentFile
 from django.contrib.auth.tokens import default_token_generator
+from django.core.files.base import ContentFile
+from django.shortcuts import get_object_or_404
+from recipes.models import (Cart, Favorite, Ingredient, Recipe,
+                            RecipeIngredient, ShortURL, Tag)
 from rest_framework import serializers
 from rest_framework.fields import SerializerMethodField
-
-from recipes.models import Ingredient, Recipe, Tag, RecipeIngredient, Favorite, Cart, RecipeTag, ShortURL
-from users.models import User, Follow
+from users.models import Follow, User
 
 
 class Base64ImageField(serializers.ImageField):
@@ -19,10 +19,10 @@ class Base64ImageField(serializers.ImageField):
             data = ContentFile(base64.b64decode(imgstr), name='temp.' + ext)
 
         return super().to_internal_value(data)
-    
 
 
 ''' Users app '''
+
 
 class UserDetailSerializer(serializers.ModelSerializer):
     is_subscribed = SerializerMethodField(read_only=True)
@@ -36,24 +36,27 @@ class UserDetailSerializer(serializers.ModelSerializer):
     def get_is_subscribed(self, obj: User) -> bool:
         if (self.context.get('request')
            and not self.context['request'].user.is_anonymous):
-            return Follow.objects.filter(user=self.context['request'].user, author=obj).exists()
+            return Follow.objects.filter(
+                user=self.context['request'].user,
+                author=obj).exists()
         return False
-    
+
 
 class UserCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'email', 'username', 'first_name', 'last_name', 'password')
+        fields = ('id', 'email', 'username',
+                  'first_name', 'last_name', 'password')
         extra_kwargs = {
             'password': {
-                'required' : True,
+                'required': True,
                 'write_only': True,
                 'allow_blank': False
             },
             'first_name': {'required': True, 'allow_blank': False},
             'last_name': {'required': True, 'allow_blank': False},
             'username': {'required': True, 'allow_blank': False},
-            'email': {'required': True ,'allow_blank': False},
+            'email': {'required': True, 'allow_blank': False},
         }
 
     def create(self, validated_data):
@@ -78,7 +81,6 @@ class SetPasswordSerializer(serializers.Serializer):
         return data
 
 
-
 class UserAvatarSerializer(serializers.ModelSerializer):
     avatar = Base64ImageField(allow_null=True)
 
@@ -87,9 +89,8 @@ class UserAvatarSerializer(serializers.ModelSerializer):
         fields = ('avatar',)
         extra_kwargs = {
             'avatar': {
-                'required' : True},
+                'required': True},
         }
-        
 
 
 class FollowSerializer(UserDetailSerializer):
@@ -103,7 +104,7 @@ class FollowSerializer(UserDetailSerializer):
                   'username', 'first_name',
                   'last_name', 'is_subscribed',
                   'recipes', 'recipes_count', 'avatar')
-        
+
     def get_recipes_count(self, obj):
         return obj.recipes.count()
 
@@ -113,9 +114,12 @@ class FollowSerializer(UserDetailSerializer):
         recipes = obj.recipes.all()
         if limit:
             recipes = recipes[:int(limit)]
-        serializer = RecipeBriefInfoSerializer(recipes, many=True, read_only=True)
+        serializer = RecipeBriefInfoSerializer(
+            recipes,
+            many=True,
+            read_only=True)
         return serializer.data
-    
+
 
 class FollowAddSerializer(FollowSerializer):
 
@@ -126,23 +130,16 @@ class FollowAddSerializer(FollowSerializer):
                   'last_name', 'is_subscribed',
                   'recipes', 'recipes_count', 'avatar')
         read_only_fields = ('email', 'username', 'avatar')
-        
+
     def validate(self, obj):
         if (self.context['request'].user == obj):
-            raise serializers.ValidationError({'errors': 'Нельзя подписаться на самого себя'})
+            raise serializers.ValidationError(
+                {'errors': 'Нельзя подписаться на самого себя'})
         return obj
-
-        
-        
-
-
-
-
-
-
 
 
 ''' Recipes app '''
+
 
 class IngredientSerializer(serializers.ModelSerializer):
 
@@ -174,14 +171,9 @@ class IngredientInRecipeCreateSerializer(serializers.ModelSerializer):
     id = serializers.PrimaryKeyRelatedField(
         queryset=Ingredient.objects.all(), source='ingredient')
 
-
     class Meta:
         model = RecipeIngredient
         fields = ('id', 'amount')
-
-
-
-
 
 
 class RecipeDetailSerializer(serializers.ModelSerializer):
@@ -219,7 +211,8 @@ class RecipeDetailSerializer(serializers.ModelSerializer):
 
 
 class RecipeCreateSerializer(serializers.ModelSerializer):
-    ingredients = IngredientInRecipeCreateSerializer(many=True, source='recipe_ingredient')
+    ingredients = IngredientInRecipeCreateSerializer(
+        many=True, source='recipe_ingredient')
     tags = serializers.PrimaryKeyRelatedField(
         queryset=Tag.objects.all(),
         many=True,
@@ -232,15 +225,15 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Recipe
         fields = ('ingredients', 'author',
-                'tags', 'image', 'name',
-                'text', 'cooking_time',)
+                  'tags', 'image', 'name',
+                  'text', 'cooking_time',)
         read_only_fields = ('author',)
         extra_kwargs = {
             'ingredients': {'required': True, 'allow_blank': False},
             'name': {'required': True, 'allow_blank': False},
             'text': {'required': True, 'allow_blank': False},
-            'image': {'required': True,},
-            'cooking_time': {'required': True,},
+            'image': {'required': True, },
+            'cooking_time': {'required': True, },
         }
 
     def validate(self, data):
@@ -255,12 +248,13 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         print(ingredients)
         if len(ingredients) == 0:
             raise serializers.ValidationError('Добавьте хотя бы 1 ингредиент')
-        
-        if (len(ingredients) != len(set([item['ingredient'] for item in ingredients]))):
-            raise serializers.ValidationError('Ингредиенты не должны повторяться')
+
+        unique = len(set([item['ingredient'] for item in ingredients]))
+        if (len(ingredients) != unique):
+            raise serializers.ValidationError(
+                'Ингредиенты не должны повторяться')
 
         return data
-
 
     def create(self, validated_data):
         print(validated_data)
@@ -269,7 +263,7 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
 
         ingredients_data = validated_data.pop('recipe_ingredient')
         recipe = Recipe.objects.create(image=image, **validated_data)
-        
+
         for ingredient in ingredients_data:
             RecipeIngredient.objects.create(
                 recipe=recipe,
@@ -279,7 +273,6 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
 
         recipe.tags.set(tags_data)
         return recipe
-    
 
     def update(self, recipe, validated_data):
         if 'recipe_ingredients' in self.initial_data:
@@ -298,10 +291,8 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         recipe.save()
         return recipe
 
-    
     def to_representation(self, instance):
         return RecipeDetailSerializer(instance, context=self.context).data
-
 
 
 class RecipeBriefInfoSerializer(serializers.ModelSerializer):
@@ -310,9 +301,8 @@ class RecipeBriefInfoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Recipe
         fields = ('id', 'name',
-                'image', 'cooking_time')
+                  'image', 'cooking_time')
         read_only_fields = fields
-
 
 
 class ShortURLSerializer(serializers.ModelSerializer):
@@ -320,6 +310,3 @@ class ShortURLSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShortURL
         exclude = ()
-
-
-

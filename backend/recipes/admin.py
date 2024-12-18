@@ -1,6 +1,5 @@
 from django.contrib import admin
-
-from recipes.models import Tag, Ingredient, Recipe, ShortURL
+from recipes.models import Ingredient, Recipe, ShortURL, Tag
 
 admin.site.register(Tag)
 admin.site.register(Ingredient)

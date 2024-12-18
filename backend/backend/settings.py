@@ -1,5 +1,5 @@
-from pathlib import Path
 import os
+from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -7,7 +7,7 @@ SECRET_KEY = 'django-insecure-ks1(=j5$3$v=z=a=-8kwx6lq7%s#hdtx-x$^89r0jcvhx(!b@7
 
 DEBUG = True
 
-ALLOWED_HOSTS = ['84.201.167.67','localhost', '127.0.0.1', 'foodgram-yp.sytes.net']
+ALLOWED_HOSTS = ['84.201.167.67', 'localhost', '127.0.0.1', 'foodgram-yp.sytes.net']
 
 
 INSTALLED_APPS = [

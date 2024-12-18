@@ -1,11 +1,12 @@
+from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-from django.contrib.auth.base_user import BaseUserManager
+
 
 class CustomUserManager(BaseUserManager):
     use_in_migrations = True
 
-    def _create_user(self, username,  email, first_name, last_name, password):
+    def _create_user(self, username, email, first_name, last_name, password):
         if not email:
             raise ValueError("User must have an email")
         if not username:
@@ -16,20 +17,36 @@ class CustomUserManager(BaseUserManager):
             raise ValueError("User must have a first name")
         if not last_name:
             raise ValueError("User must have a last name")
-        
+
         email = self.normalize_email(email)
         username = self.model.normalize_username(username)
-        user = self.model(username=username, email=email, first_name=first_name, last_name=last_name)
+        user = self.model(
+            username=username,
+            email=email,
+            first_name=first_name,
+            last_name=last_name)
         user.set_password(password)
         user.save()
         return user
 
-    def create_user(self, username,  email, first_name, last_name, password, **extra_fields):
+    def create_user(
+            self,
+            username,
+            email,
+            first_name,
+            last_name,
+            password,
+            **extra_fields):
         extra_fields.setdefault('is_staff', False)
         extra_fields.setdefault('is_superuser', False)
-        return self._create_user(username,  email, first_name, last_name, password)
-    
-    def create_superuser(self, username,  email, password, **extra_fields):
+        return self._create_user(
+            username,
+            email,
+            first_name,
+            last_name,
+            password)
+
+    def create_superuser(self, username, email, password, **extra_fields):
         if not email:
             raise ValueError("User must have an email")
         if not password:
@@ -43,8 +60,6 @@ class CustomUserManager(BaseUserManager):
         user.is_staff = True
         user.save()
         return user
-
-
 
 
 class User(AbstractUser):
@@ -68,10 +83,9 @@ class User(AbstractUser):
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
 
-
     def __str__(self):
         return self.username
-    
+
     @staticmethod
     def has_perm(perm, obj=None):
         return True
@@ -79,7 +93,7 @@ class User(AbstractUser):
     @staticmethod
     def has_module_perms(app_label):
         return True
-    
+
 
 class Follow(models.Model):
 

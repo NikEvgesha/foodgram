@@ -1,34 +1,28 @@
-import hashlib, pathlib, csv
+import csv
+import hashlib
+import pathlib
 
-from django.shortcuts import get_object_or_404, redirect
-from django.http import HttpResponse
-from django.db import connection
-
-from rest_framework import status, mixins, viewsets, generics
-from rest_framework.decorators import api_view
-from rest_framework.permissions import AllowAny, SAFE_METHODS, IsAuthenticated, IsAuthenticatedOrReadOnly
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.decorators import action
-from rest_framework.response import Response
-
-from recipes.models import Ingredient, Tag, Recipe, ShortURL, Cart, Favorite
-from users.models import User, Follow
-from api.serializers import (
-    IngredientSerializer,
-    TagSerializer,
-    RecipeDetailSerializer,
-    RecipeCreateSerializer,
-    UserDetailSerializer,
-    UserCreateSerializer,
-    SetPasswordSerializer,
-    UserAvatarSerializer,
-    ShortURLSerializer,
-    RecipeBriefInfoSerializer,
-    FollowSerializer,
-    FollowAddSerializer)
 from api.filters import IngredientFilter, RecipeFilter
 from api.pagination import CustomPaginator
 from api.permissions import IsAuthorOrReadOnly
+from api.serializers import (FollowAddSerializer, FollowSerializer,
+                             IngredientSerializer, RecipeBriefInfoSerializer,
+                             RecipeCreateSerializer, RecipeDetailSerializer,
+                             SetPasswordSerializer, ShortURLSerializer,
+                             TagSerializer, UserAvatarSerializer,
+                             UserCreateSerializer, UserDetailSerializer)
+from django.db import connection
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, redirect
+from django_filters.rest_framework import DjangoFilterBackend
+from recipes.models import Cart, Favorite, Ingredient, Recipe, ShortURL, Tag
+from rest_framework import generics, mixins, status, viewsets
+from rest_framework.decorators import action, api_view
+from rest_framework.permissions import (SAFE_METHODS, AllowAny,
+                                        IsAuthenticated,
+                                        IsAuthenticatedOrReadOnly)
+from rest_framework.response import Response
+from users.models import Follow, User
 
 
 class UserDetailViewSet(mixins.CreateModelMixin,
@@ -273,18 +267,19 @@ class RecipeViewSet(mixins.CreateModelMixin,
             recipes_ingredient.measurement_unit as measure
             FROM recipes_cart
             INNER JOIN recipes_recipe on recipe_id = recipes_recipe.id
-            JOIN recipes_recipeingredient on recipes_recipe.id = recipes_recipeingredient.recipe_id
-            INNER JOIN recipes_ingredient on recipes_recipeingredient.ingredient_id = recipes_ingredient.id
+            JOIN recipes_recipeingredient 
+            on recipes_recipe.id = recipes_recipeingredient.recipe_id
+            INNER JOIN recipes_ingredient 
+            on recipes_recipeingredient.ingredient_id = recipes_ingredient.id
             WHERE recipes_cart.user_id = {user.id}
-            GROUP BY recipes_ingredient.name, recipes_ingredient.measurement_unit
+            GROUP BY recipes_ingredient.name,
+                recipes_ingredient.measurement_unit;
         '''
 
         with connection.cursor() as cursor:
             cursor.execute(query)
             ingredients = cursor.fetchall()
 
-
-        #writer = csv.writer(response)
         content = 'Список покупок\n'
         for ingredient in ingredients:
             row = f'{ingredient[1]} - {ingredient[2]} {ingredient[3]}.\n\n'
@@ -293,13 +288,12 @@ class RecipeViewSet(mixins.CreateModelMixin,
         response = HttpResponse(content, content_type='text/plain')
         filename = 'shopping_list.txt'
         response['Content-Disposition'] = (f'attachment; filename={filename}')
-        
+
         return response
-
-
 
 
 @api_view(['GET'])
 def RedirectURL(request, hash):
     url = get_object_or_404(ShortURL, short_url=hash)
-    return redirect(f'{request.scheme}://{request.get_host()}{url.original_url}')
+    return redirect(
+        f'{request.scheme}://{request.get_host()}{url.original_url}')

@@ -1,17 +1,13 @@
 import csv
-import os
 
 from django.core.management.base import BaseCommand
-
 from recipes.models import Ingredient
-from backend.settings import BASE_DIR
 
 
 class Command(BaseCommand):
 
     def handle(self, *args, **options):
         cur_id = 0
-        # filepath = os.path.join(BASE_DIR.parent, 'data/') + 'ingredients.csv'
         with open('data/ingredients.csv', encoding='utf-8') as f:
             reader = csv.reader(f)
             next(reader)
