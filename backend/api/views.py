@@ -1,5 +1,15 @@
 import hashlib
 
+from django.db import connection
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, redirect
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import mixins, status, viewsets
+from rest_framework.decorators import action, api_view
+from rest_framework.permissions import (SAFE_METHODS, AllowAny,
+                                        IsAuthenticated)
+from rest_framework.response import Response
+
 from api.filters import IngredientFilter, RecipeFilter
 from api.pagination import CustomPaginator
 from api.permissions import IsAuthorOrReadOnly
@@ -9,17 +19,8 @@ from api.serializers import (FollowAddSerializer, FollowSerializer,
                              SetPasswordSerializer,
                              TagSerializer, UserAvatarSerializer,
                              UserCreateSerializer, UserDetailSerializer)
-from django.db import connection
-from django.http import HttpResponse
-from django.shortcuts import get_object_or_404, redirect
-from django_filters.rest_framework import DjangoFilterBackend
-from recipes.models import Cart, Favorite, Ingredient, Recipe, ShortURL, Tag
-from rest_framework import mixins, status, viewsets
-from rest_framework.decorators import action, api_view
-from rest_framework.permissions import (SAFE_METHODS, AllowAny,
-                                        IsAuthenticated)
-from rest_framework.response import Response
 from users.models import Follow, User
+from recipes.models import Cart, Favorite, Ingredient, Recipe, ShortURL, Tag
 
 
 class UserDetailViewSet(mixins.CreateModelMixin,
@@ -117,16 +118,15 @@ class UserDetailViewSet(mixins.CreateModelMixin,
                 serializer.data,
                 status=status.HTTP_201_CREATED)
 
-        if request.method == 'DELETE':
-            if not Follow.objects.filter(
-                    user=request.user,
-                    author=author).exists():
-                return Response(
-                    'Такой подписки не существует',
-                    status=status.HTTP_400_BAD_REQUEST)
-            get_object_or_404(Follow, user=request.user,
-                              author=author).delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
+        if not Follow.objects.filter(
+                user=request.user,
+                author=author).exists():
+            return Response(
+                'Такой подписки не существует',
+                status=status.HTTP_400_BAD_REQUEST)
+        get_object_or_404(Follow, user=request.user,
+                            author=author).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class IngredientViewSet(mixins.ListModelMixin,
@@ -203,16 +203,15 @@ class RecipeViewSet(mixins.CreateModelMixin,
             serializer = RecipeBriefInfoSerializer(recipe)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        if (request.method == 'DELETE'):
-            recipe = get_object_or_404(Recipe, id=pk)
-            cart_obj = Cart.objects.filter(user=request.user, recipe=recipe)
-            if cart_obj.exists():
-                cart_obj.delete()
-                return Response(status=status.HTTP_204_NO_CONTENT)
-            return Response(
-                {'errors': 'Рецепта нет в корзине покупок'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        recipe = get_object_or_404(Recipe, id=pk)
+        cart_obj = Cart.objects.filter(user=request.user, recipe=recipe)
+        if cart_obj.exists():
+            cart_obj.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(
+            {'errors': 'Рецепта нет в корзине покупок'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     @action(
         detail=True,
@@ -233,16 +232,15 @@ class RecipeViewSet(mixins.CreateModelMixin,
             serializer = RecipeBriefInfoSerializer(recipe)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        if (request.method == 'DELETE'):
-            recipe = get_object_or_404(Recipe, id=pk)
-            fav_obj = Favorite.objects.filter(user=request.user, recipe=recipe)
-            if fav_obj.exists():
-                fav_obj.delete()
-                return Response(status=status.HTTP_204_NO_CONTENT)
-            return Response(
-                {'errors': 'Рецепта нет в списке избранного'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        recipe = get_object_or_404(Recipe, id=pk)
+        fav_obj = Favorite.objects.filter(user=request.user, recipe=recipe)
+        if fav_obj.exists():
+            fav_obj.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(
+            {'errors': 'Рецепта нет в списке избранного'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     @action(
         detail=False,
@@ -259,9 +257,9 @@ class RecipeViewSet(mixins.CreateModelMixin,
             recipes_ingredient.measurement_unit as measure
             FROM recipes_cart
             INNER JOIN recipes_recipe on recipe_id = recipes_recipe.id
-            JOIN recipes_recipeingredient 
+            JOIN recipes_recipeingredient
             on recipes_recipe.id = recipes_recipeingredient.recipe_id
-            INNER JOIN recipes_ingredient 
+            INNER JOIN recipes_ingredient
             on recipes_recipeingredient.ingredient_id = recipes_ingredient.id
             WHERE recipes_cart.user_id = {user.id}
             GROUP BY recipes_ingredient.name,
@@ -285,7 +283,7 @@ class RecipeViewSet(mixins.CreateModelMixin,
 
 
 @api_view(['GET'])
-def RedirectURL(request, hash):
+def redirectURL(request, hash):
     url = get_object_or_404(ShortURL, short_url=hash)
     return redirect(
         f'{request.scheme}://{request.get_host()}{url.original_url}')

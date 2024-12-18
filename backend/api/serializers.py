@@ -1,8 +1,6 @@
 import base64
 
-from django.contrib.auth.tokens import default_token_generator
 from django.core.files.base import ContentFile
-from django.shortcuts import get_object_or_404
 from recipes.models import (Cart, Favorite, Ingredient, Recipe,
                             RecipeIngredient, ShortURL, Tag)
 from rest_framework import serializers

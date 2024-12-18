@@ -26,7 +26,6 @@ class RecipeFilter(FilterSet):
     author = filters.ModelChoiceFilter(
         queryset=User.objects.all()
     )
-    
 
     class Meta:
         model = Recipe
