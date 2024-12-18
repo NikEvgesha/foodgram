@@ -11,12 +11,20 @@ class IngredientFilter(FilterSet):
 
 
 class RecipeFilter(FilterSet):
-    tags = filters.AllValuesMultipleFilter(field_name='tags__slug')
+    tags = filters.ModelMultipleChoiceFilter(
+        field_name='tags__slug',
+        to_field_name='slug',
+        queryset=Tag.objects.all()
+    )
     is_favorited = filters.BooleanFilter(
-        method='is_favorited_filter')
+        method='is_favorite_filter'
+    )
     is_in_shopping_cart = filters.BooleanFilter(
-        method='is_in_shopping_cart_filter')
-    author = filters.ModelChoiceFilter(queryset=User.objects.all())
+        method='is_in_shopping_cart_filter'
+    )
+    author = filters.ModelChoiceFilter(
+        queryset=User.objects.all()
+    )
     
 
     class Meta:
@@ -24,7 +32,11 @@ class RecipeFilter(FilterSet):
         fields = ('author', 'tags', 'is_favorited', 'is_in_shopping_cart')
 
     def is_favorite_filter(self, queryset, name, value):
-        return self.filter_from_kwargs(queryset, value, name)
+        if value and not self.request.user.is_anonymous:
+            return queryset.filter(favorites__user=self.request.user)
+        return queryset
 
     def is_in_shopping_cart_filter(self, queryset, name, value):
-        return self.filter_from_kwargs(queryset, value, name)
+        if value and not self.request.user.is_anonymous:
+            return queryset.filter(cart__user=self.request.user)
+        return queryset

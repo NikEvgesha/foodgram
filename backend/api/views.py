@@ -1,7 +1,8 @@
-import hashlib, pathlib
+import hashlib, pathlib, csv
 
 from django.shortcuts import get_object_or_404, redirect
-from django.http import JsonResponse
+from django.http import HttpResponse
+from django.db import connection
 
 from rest_framework import status, mixins, viewsets, generics
 from rest_framework.decorators import api_view
@@ -10,7 +11,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from recipes.models import Ingredient, Tag, Recipe, ShortURL
+from recipes.models import Ingredient, Tag, Recipe, ShortURL, Cart, Favorite
 from users.models import User, Follow
 from api.serializers import (
     IngredientSerializer,
@@ -21,7 +22,10 @@ from api.serializers import (
     UserCreateSerializer,
     SetPasswordSerializer,
     UserAvatarSerializer,
-    ShortURLSerializer)
+    ShortURLSerializer,
+    RecipeBriefInfoSerializer,
+    FollowSerializer,
+    FollowAddSerializer)
 from api.filters import IngredientFilter, RecipeFilter
 from api.pagination import CustomPaginator
 from api.permissions import IsAuthorOrReadOnly
@@ -77,11 +81,65 @@ class UserDetailViewSet(mixins.CreateModelMixin,
                 user.avatar.delete(save=True)
                 return Response(status=status.HTTP_204_NO_CONTENT)
             return Response(status=status.HTTP_404_NOT_FOUND)
-
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response({"avatar": user.avatar.url},
                         status=status.HTTP_200_OK)
+    
+
+    @action(
+        detail=False,
+        methods=('GET',),
+        permission_classes=(IsAuthenticated, ),
+        url_path='subscriptions',
+        url_name='subscriptions',
+    )
+    def subscriptions(self, request):
+        queryset = User.objects.filter(followed__user=request.user)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = FollowSerializer(page, many=True,
+                                          context={'request': request})
+            return self.get_paginated_response(serializer.data)
+        return Response('Нет подписок :(',
+                        status=status.HTTP_400_BAD_REQUEST)
+    
+
+    @action(
+        detail=True,
+        methods=('POST', 'DELETE'),
+        permission_classes=(IsAuthenticated,),
+        url_path='subscribe',
+        url_name='subscribe',
+    )
+    def subscribe(self, request, pk):
+        author = get_object_or_404(User, id=pk)
+        if request.method == 'POST':
+            if Follow.objects.filter(user=request.user, author=author).exists():
+                return Response(
+                    'Вы уже подписаны на этого автора',
+                    status=status.HTTP_400_BAD_REQUEST)
+            serializer = FollowAddSerializer(
+                author,
+                data=request.data,
+                context={"request": request})
+            serializer.is_valid(raise_exception=True)
+            Follow.objects.create(user=request.user, author=author)
+            return Response(
+                serializer.data,
+                status=status.HTTP_201_CREATED)
+
+        if request.method == 'DELETE':
+            if not Follow.objects.filter(user=request.user,
+                              author=author).exists():
+                return Response('Такой подписки не существует', status=status.HTTP_400_BAD_REQUEST)
+            get_object_or_404(Follow, user=request.user,
+                              author=author).delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+
+
 
 
 
@@ -105,10 +163,14 @@ class TagViewSet(mixins.ListModelMixin,
     pagination_class = None
 
 
-class RecipeViewSet(viewsets.ModelViewSet):
+class RecipeViewSet(mixins.CreateModelMixin,
+                  mixins.ListModelMixin,
+                  mixins.RetrieveModelMixin,
+                  mixins.UpdateModelMixin,
+                  mixins.DestroyModelMixin,
+                  viewsets.GenericViewSet):
     queryset = Recipe.objects.all()
     permission_classes = (IsAuthorOrReadOnly, )
-    http_method_names = ['get', 'post', 'patch', 'delete']
     pagination_class = CustomPaginator
     filter_backends = (DjangoFilterBackend,)
     filterset_class = RecipeFilter
@@ -127,19 +189,117 @@ class RecipeViewSet(viewsets.ModelViewSet):
         url_path='get-link',
     )
     def get_link(self, request, pk):
-        original_url = str(pathlib.Path(request.get_full_path()).parent)
-        hash_value = hashlib.md5(original_url.encode()).hexdigest()[:16]
+        original_url = f'/recipes/{pk}'
+        url = ShortURL.objects.filter(original_url=original_url)
+        if (url.exists()):
+            hash_value = url[0].short_url
+        else:
+            hash_value = hashlib.md5(original_url.encode()).hexdigest()[:16]
+            ShortURL.objects.create(short_url=hash_value, original_url=original_url)
         short_url = f'{request.scheme}://{request.get_host()}/url/{hash_value}/'
-        url = ShortURL.objects.create(short_url=hash_value, original_url=original_url)
         return Response({'short-link': short_url}, status=status.HTTP_200_OK)
     
 
+    @action(
+        detail=True,
+        methods=('POST', 'DELETE'),
+        permission_classes=(IsAuthenticated,)
+    )
+    def shopping_cart(self, request, pk):
+        if (request.method == 'POST'):
+            if Cart.objects.filter(user=request.user, recipe__id=pk).exists():
+                return Response(
+                    {'errors': 'Этот рецепт уже в корзине'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            recipe = get_object_or_404(Recipe, id=pk)
+            Cart.objects.create(user=request.user, recipe=recipe)
+            serializer = RecipeBriefInfoSerializer(recipe)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+        if (request.method == 'DELETE'):
+            recipe = get_object_or_404(Recipe, id=pk)
+            cart_obj = Cart.objects.filter(user=request.user, recipe=recipe)
+            if cart_obj.exists():
+                cart_obj.delete()
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            return Response(
+                {'errors': 'Рецепта нет в корзине покупок'},
+                status=status.HTTP_400_BAD_REQUEST\
+            )
+        
+
+    @action(
+        detail=True,
+        methods=('POST', 'DELETE'),
+        permission_classes=(IsAuthenticated,)
+    )
+    def favorite(self, request, pk):
+        if (request.method == 'POST'):
+            if Favorite.objects.filter(user=request.user, recipe__id=pk).exists():
+                return Response(
+                    {'errors': 'Этот рецепт уже в избранном'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            recipe = get_object_or_404(Recipe, id=pk)
+            Favorite.objects.create(user=request.user, recipe=recipe)
+            serializer = RecipeBriefInfoSerializer(recipe)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+        if (request.method == 'DELETE'):
+            recipe = get_object_or_404(Recipe, id=pk)
+            fav_obj = Favorite.objects.filter(user=request.user, recipe=recipe)
+            if fav_obj.exists():
+                fav_obj.delete()
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            return Response(
+                {'errors': 'Рецепта нет в списке избранного'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+
+    @action(
+        detail=False,
+        methods=('GET',),
+        permission_classes=(IsAuthenticated,)
+    )
+    def download_shopping_cart(self, request):
+        user = request.user
+        print("user id: ", user.id)
+        query = f'''
+        SELECT 1 as id,
+            recipes_ingredient.name as name,
+            SUM(recipes_recipeingredient.amount) as amount,
+            recipes_ingredient.measurement_unit as measure
+            FROM recipes_cart
+            INNER JOIN recipes_recipe on recipe_id = recipes_recipe.id
+            JOIN recipes_recipeingredient on recipes_recipe.id = recipes_recipeingredient.recipe_id
+            INNER JOIN recipes_ingredient on recipes_recipeingredient.ingredient_id = recipes_ingredient.id
+            WHERE recipes_cart.user_id = {user.id}
+            GROUP BY recipes_ingredient.name, recipes_ingredient.measurement_unit
+        '''
+
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+            ingredients = cursor.fetchall()
+
+
+        #writer = csv.writer(response)
+        content = 'Список покупок\n'
+        for ingredient in ingredients:
+            row = f'{ingredient[1]} - {ingredient[2]} {ingredient[3]}.\n\n'
+            content += row
+
+        response = HttpResponse(content, content_type='text/plain')
+        filename = 'shopping_list.txt'
+        response['Content-Disposition'] = (f'attachment; filename={filename}')
+        
+        return response
+
+
+
+
 @api_view(['GET'])
 def RedirectURL(request, hash):
-    try:
-        url = ShortURL.objects.get(short_url=hash)
-        print('URL FOUND: ', url.original_url)
-        serializer = ShortURLSerializer(url)
-        return redirect(f'{request.scheme}://{request.get_host()}{url.original_url}')
-    except ShortURL.DoesNotExist:
-        return Response({'error': 'Short URL not found'}, status=status.HTTP_404_NOT_FOUND)
+    url = get_object_or_404(ShortURL, short_url=hash)
+    return redirect(f'{request.scheme}://{request.get_host()}{url.original_url}')

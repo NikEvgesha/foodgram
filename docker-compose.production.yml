@@ -13,7 +13,7 @@ services:
       - pg_data:/var/lib/postgresql/data
 
   backend:
-    build: ./backend/
+    image: nikevgesha/foodgram_backend
     env_file: .env
     depends_on:
       - db
@@ -23,13 +23,13 @@ services:
 
   frontend:
     env_file: .env
-    build: ./frontend/
+    image: nikevgesha/foodgram_frontend
     command: cp -r /app/build/. /frontend_static/
     volumes:
       - static:/frontend_static
 
   gateway:
-    build: ./infra/
+    image: nikevgesha/foodgram_gateway
     depends_on:
       - frontend
       - backend
