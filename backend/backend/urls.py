@@ -1,6 +1,7 @@
-from api.views import redirect_url
 from django.contrib import admin
 from django.urls import include, path
+
+from api.views import redirect_url
 
 urlpatterns = [
     path('admin/', admin.site.urls),
