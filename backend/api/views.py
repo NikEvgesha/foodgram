@@ -124,8 +124,10 @@ class UserDetailViewSet(mixins.CreateModelMixin,
             return Response(
                 'Такой подписки не существует',
                 status=status.HTTP_400_BAD_REQUEST)
-        get_object_or_404(Follow, user=request.user,
-                            author=author).delete()
+        get_object_or_404(
+            Follow,
+            user=request.user,
+            author=author).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -283,7 +285,7 @@ class RecipeViewSet(mixins.CreateModelMixin,
 
 
 @api_view(['GET'])
-def redirectURL(request, hash):
+def redirect_url(request, hash):
     url = get_object_or_404(ShortURL, short_url=hash)
     return redirect(
         f'{request.scheme}://{request.get_host()}{url.original_url}')
