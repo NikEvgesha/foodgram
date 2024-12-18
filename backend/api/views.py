@@ -1,6 +1,4 @@
-import csv
 import hashlib
-import pathlib
 
 from api.filters import IngredientFilter, RecipeFilter
 from api.pagination import CustomPaginator
@@ -8,7 +6,7 @@ from api.permissions import IsAuthorOrReadOnly
 from api.serializers import (FollowAddSerializer, FollowSerializer,
                              IngredientSerializer, RecipeBriefInfoSerializer,
                              RecipeCreateSerializer, RecipeDetailSerializer,
-                             SetPasswordSerializer, ShortURLSerializer,
+                             SetPasswordSerializer,
                              TagSerializer, UserAvatarSerializer,
                              UserCreateSerializer, UserDetailSerializer)
 from django.db import connection
@@ -16,19 +14,18 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django_filters.rest_framework import DjangoFilterBackend
 from recipes.models import Cart, Favorite, Ingredient, Recipe, ShortURL, Tag
-from rest_framework import generics, mixins, status, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action, api_view
 from rest_framework.permissions import (SAFE_METHODS, AllowAny,
-                                        IsAuthenticated,
-                                        IsAuthenticatedOrReadOnly)
+                                        IsAuthenticated)
 from rest_framework.response import Response
 from users.models import Follow, User
 
 
 class UserDetailViewSet(mixins.CreateModelMixin,
-                  mixins.ListModelMixin,
-                  mixins.RetrieveModelMixin,
-                  viewsets.GenericViewSet):
+                        mixins.ListModelMixin,
+                        mixins.RetrieveModelMixin,
+                        viewsets.GenericViewSet):
     queryset = User.objects.all().order_by('id')
     serializer_class = UserDetailSerializer
     permission_classes = (AllowAny, )
@@ -40,14 +37,13 @@ class UserDetailViewSet(mixins.CreateModelMixin,
         if self.action == 'set_password':
             return SetPasswordSerializer
         return UserCreateSerializer
-    
+
     @action(detail=False, methods=['GET'],
             permission_classes=(IsAuthenticated,))
     def me(self, request):
         serializer = UserDetailSerializer(request.user)
         return Response(serializer.data,
                         status=status.HTTP_200_OK)
-
 
     @action(detail=False, methods=["POST"],
             permission_classes=(IsAuthenticated,))
@@ -58,7 +54,6 @@ class UserDetailViewSet(mixins.CreateModelMixin,
         user.set_password(serializer.validated_data["new_password"])
         user.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
-    
 
     @action(
         detail=False,
@@ -79,7 +74,6 @@ class UserDetailViewSet(mixins.CreateModelMixin,
         serializer.save()
         return Response({"avatar": user.avatar.url},
                         status=status.HTTP_200_OK)
-    
 
     @action(
         detail=False,
@@ -97,7 +91,6 @@ class UserDetailViewSet(mixins.CreateModelMixin,
             return self.get_paginated_response(serializer.data)
         return Response('Нет подписок :(',
                         status=status.HTTP_400_BAD_REQUEST)
-    
 
     @action(
         detail=True,
@@ -108,8 +101,9 @@ class UserDetailViewSet(mixins.CreateModelMixin,
     )
     def subscribe(self, request, pk):
         author = get_object_or_404(User, id=pk)
+        user = request.user
         if request.method == 'POST':
-            if Follow.objects.filter(user=request.user, author=author).exists():
+            if Follow.objects.filter(user=user, author=author).exists():
                 return Response(
                     'Вы уже подписаны на этого автора',
                     status=status.HTTP_400_BAD_REQUEST)
@@ -124,25 +118,22 @@ class UserDetailViewSet(mixins.CreateModelMixin,
                 status=status.HTTP_201_CREATED)
 
         if request.method == 'DELETE':
-            if not Follow.objects.filter(user=request.user,
-                              author=author).exists():
-                return Response('Такой подписки не существует', status=status.HTTP_400_BAD_REQUEST)
+            if not Follow.objects.filter(
+                    user=request.user,
+                    author=author).exists():
+                return Response(
+                    'Такой подписки не существует',
+                    status=status.HTTP_400_BAD_REQUEST)
             get_object_or_404(Follow, user=request.user,
                               author=author).delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-
-
-
-
 
 
 class IngredientViewSet(mixins.ListModelMixin,
                         mixins.RetrieveModelMixin,
                         viewsets.GenericViewSet):
     queryset = Ingredient.objects.all()
-    permission_classes = (AllowAny, ) # IsAdminOrReadOnly
+    permission_classes = (AllowAny, )
     serializer_class = IngredientSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = IngredientFilter
@@ -158,11 +149,11 @@ class TagViewSet(mixins.ListModelMixin,
 
 
 class RecipeViewSet(mixins.CreateModelMixin,
-                  mixins.ListModelMixin,
-                  mixins.RetrieveModelMixin,
-                  mixins.UpdateModelMixin,
-                  mixins.DestroyModelMixin,
-                  viewsets.GenericViewSet):
+                    mixins.ListModelMixin,
+                    mixins.RetrieveModelMixin,
+                    mixins.UpdateModelMixin,
+                    mixins.DestroyModelMixin,
+                    viewsets.GenericViewSet):
     queryset = Recipe.objects.all()
     permission_classes = (IsAuthorOrReadOnly, )
     pagination_class = CustomPaginator
@@ -189,10 +180,11 @@ class RecipeViewSet(mixins.CreateModelMixin,
             hash_value = url[0].short_url
         else:
             hash_value = hashlib.md5(original_url.encode()).hexdigest()[:16]
-            ShortURL.objects.create(short_url=hash_value, original_url=original_url)
-        short_url = f'{request.scheme}://{request.get_host()}/url/{hash_value}/'
-        return Response({'short-link': short_url}, status=status.HTTP_200_OK)
-    
+            ShortURL.objects.create(
+                short_url=hash_value,
+                original_url=original_url)
+        short = f'{request.scheme}://{request.get_host()}/url/{hash_value}/'
+        return Response({'short-link': short}, status=status.HTTP_200_OK)
 
     @action(
         detail=True,
@@ -210,7 +202,7 @@ class RecipeViewSet(mixins.CreateModelMixin,
             Cart.objects.create(user=request.user, recipe=recipe)
             serializer = RecipeBriefInfoSerializer(recipe)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        
+
         if (request.method == 'DELETE'):
             recipe = get_object_or_404(Recipe, id=pk)
             cart_obj = Cart.objects.filter(user=request.user, recipe=recipe)
@@ -219,9 +211,8 @@ class RecipeViewSet(mixins.CreateModelMixin,
                 return Response(status=status.HTTP_204_NO_CONTENT)
             return Response(
                 {'errors': 'Рецепта нет в корзине покупок'},
-                status=status.HTTP_400_BAD_REQUEST\
+                status=status.HTTP_400_BAD_REQUEST
             )
-        
 
     @action(
         detail=True,
@@ -230,7 +221,9 @@ class RecipeViewSet(mixins.CreateModelMixin,
     )
     def favorite(self, request, pk):
         if (request.method == 'POST'):
-            if Favorite.objects.filter(user=request.user, recipe__id=pk).exists():
+            if Favorite.objects.filter(
+                    user=request.user,
+                    recipe__id=pk).exists():
                 return Response(
                     {'errors': 'Этот рецепт уже в избранном'},
                     status=status.HTTP_400_BAD_REQUEST
@@ -239,7 +232,7 @@ class RecipeViewSet(mixins.CreateModelMixin,
             Favorite.objects.create(user=request.user, recipe=recipe)
             serializer = RecipeBriefInfoSerializer(recipe)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        
+
         if (request.method == 'DELETE'):
             recipe = get_object_or_404(Recipe, id=pk)
             fav_obj = Favorite.objects.filter(user=request.user, recipe=recipe)
@@ -250,7 +243,6 @@ class RecipeViewSet(mixins.CreateModelMixin,
                 {'errors': 'Рецепта нет в списке избранного'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
 
     @action(
         detail=False,

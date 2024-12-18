@@ -128,5 +128,5 @@ DJOSER = {
         'user': 'api.serializers.UserDetailSerializer',
     },
     'HIDE_USERS': False,
-    'SET_PASSWORD_RETYPE' : False
+    'SET_PASSWORD_RETYPE': False
 }
