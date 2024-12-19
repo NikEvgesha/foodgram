@@ -74,7 +74,7 @@ jobs:
         passphrase: ${{ secrets.SSH_PASSPHRASE }}
         script: |
           cd foodgram
-          sudo docker-compose pull ${{ secrets.DOCKER_USERNAME }}/foodgram_backend:latest
+          sudo docker pull ${{ secrets.DOCKER_USERNAME }}/foodgram_backend:latest
           sudo docker compose -f docker-compose.production.yml stop
           sudo docker compose -f docker-compose.production.yml up -d --build
           sudo docker compose -f docker-compose.production.yml exec backend sh ./dbclean.sh
