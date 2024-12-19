@@ -244,7 +244,6 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Теги должны быть уникальные')
 
         ingredients = data.get('recipe_ingredient', [])
-        print(ingredients)
         if len(ingredients) == 0:
             raise serializers.ValidationError('Добавьте хотя бы 1 ингредиент')
 
@@ -256,7 +255,6 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        print(validated_data)
         image = validated_data.pop('image')
         tags_data = validated_data.pop('tags')
 
