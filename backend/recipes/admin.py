@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from recipes.models import Ingredient, Recipe, ShortURL, Tag, Cart, Favorite
 
+
 @admin.register(Recipe)
 class RecipeAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'author', 'in_favorites')
