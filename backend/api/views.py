@@ -86,7 +86,7 @@ class UserDetailViewSet(UserViewSet):
             serializer = FollowAddSerializer(
                 author,
                 data=request.data,
-                context={"request": request})
+                context={'request': request})
             serializer.is_valid(raise_exception=True)
             Follow.objects.create(user=request.user, author=author)
             return Response(
