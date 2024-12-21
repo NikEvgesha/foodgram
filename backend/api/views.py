@@ -1,9 +1,10 @@
 import hashlib
 
-from django.db import connection
+from django.db.models import Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django_filters.rest_framework import DjangoFilterBackend
+from djoser.views import UserViewSet
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action, api_view
 from rest_framework.permissions import (SAFE_METHODS, AllowAny,
@@ -16,72 +17,48 @@ from api.permissions import IsAuthorOrReadOnly
 from api.serializers import (FollowAddSerializer, FollowSerializer,
                              IngredientSerializer, RecipeBriefInfoSerializer,
                              RecipeCreateSerializer, RecipeDetailSerializer,
-                             SetPasswordSerializer,
-                             TagSerializer, UserAvatarSerializer,
-                             UserCreateSerializer, UserDetailSerializer)
+                             TagSerializer, UserAvatarSerializer)
 from users.models import Follow, User
-from recipes.models import Cart, Favorite, Ingredient, Recipe, ShortURL, Tag
+from recipes.models import (Cart, Favorite, Ingredient,
+                            Recipe, ShortURL, Tag, RecipeIngredient)
 
 
-class UserDetailViewSet(mixins.CreateModelMixin,
-                        mixins.ListModelMixin,
-                        mixins.RetrieveModelMixin,
-                        viewsets.GenericViewSet):
-    queryset = User.objects.all().order_by('id')
-    serializer_class = UserDetailSerializer
-    permission_classes = (AllowAny, )
+class UserDetailViewSet(UserViewSet):
     pagination_class = CustomPaginator
 
-    def get_serializer_class(self):
-        if self.action in ('list', 'retrieve'):
-            return UserDetailSerializer
-        if self.action == 'set_password':
-            return SetPasswordSerializer
-        return UserCreateSerializer
-
-    @action(detail=False, methods=['GET'],
-            permission_classes=(IsAuthenticated,))
-    def me(self, request):
-        serializer = UserDetailSerializer(request.user)
-        return Response(serializer.data,
-                        status=status.HTTP_200_OK)
-
-    @action(detail=False, methods=["POST"],
-            permission_classes=(IsAuthenticated,))
-    def set_password(self, request):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = request.user
-        user.set_password(serializer.validated_data["new_password"])
-        user.save()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+    @action(
+        methods=['GET'],
+        detail=False,
+        permission_classes=[IsAuthenticated, ],
+        url_name='me',
+    )
+    def me(self, request, *args, **kwargs):
+        return super().me(request, *args, **kwargs)
 
     @action(
         detail=False,
         methods=['PUT', 'DELETE'],
         permission_classes=(IsAuthenticated,),
-        url_path="me/avatar",
+        url_path='me/avatar',
     )
     def avatar(self, request):
         user = request.user
         serializer = UserAvatarSerializer(user, data=request.data)
 
-        if request.method == "DELETE":
+        if request.method == 'DELETE':
             if user.avatar:
                 user.avatar.delete(save=True)
                 return Response(status=status.HTTP_204_NO_CONTENT)
             return Response(status=status.HTTP_404_NOT_FOUND)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response({"avatar": user.avatar.url},
+        return Response({'avatar': user.avatar.url},
                         status=status.HTTP_200_OK)
 
     @action(
         detail=False,
         methods=('GET',),
-        permission_classes=(IsAuthenticated, ),
-        url_path='subscriptions',
-        url_name='subscriptions',
+        permission_classes=(IsAuthenticated, )
     )
     def subscriptions(self, request):
         queryset = User.objects.filter(followed__user=request.user)
@@ -96,12 +73,10 @@ class UserDetailViewSet(mixins.CreateModelMixin,
     @action(
         detail=True,
         methods=('POST', 'DELETE'),
-        permission_classes=(IsAuthenticated,),
-        url_path='subscribe',
-        url_name='subscribe',
+        permission_classes=(IsAuthenticated,)
     )
-    def subscribe(self, request, pk):
-        author = get_object_or_404(User, id=pk)
+    def subscribe(self, request, id):
+        author = get_object_or_404(User, id=id)
         user = request.user
         if request.method == 'POST':
             if Follow.objects.filter(user=user, author=author).exists():
@@ -250,31 +225,21 @@ class RecipeViewSet(mixins.CreateModelMixin,
         permission_classes=(IsAuthenticated,)
     )
     def download_shopping_cart(self, request):
-        user = request.user
-        print("user id: ", user.id)
-        query = f'''
-        SELECT 1 as id,
-            recipes_ingredient.name as name,
-            SUM(recipes_recipeingredient.amount) as amount,
-            recipes_ingredient.measurement_unit as measure
-            FROM recipes_cart
-            INNER JOIN recipes_recipe on recipe_id = recipes_recipe.id
-            JOIN recipes_recipeingredient
-            on recipes_recipe.id = recipes_recipeingredient.recipe_id
-            INNER JOIN recipes_ingredient
-            on recipes_recipeingredient.ingredient_id = recipes_ingredient.id
-            WHERE recipes_cart.user_id = {user.id}
-            GROUP BY recipes_ingredient.name,
-                recipes_ingredient.measurement_unit;
-        '''
-
-        with connection.cursor() as cursor:
-            cursor.execute(query)
-            ingredients = cursor.fetchall()
+        cart = (Cart.objects
+                .filter(user=request.user)
+                .values_list('recipe')
+                )
+        ingredients = (RecipeIngredient.objects
+                       .filter(recipe_id__in=cart,)
+                       .values('ingredient__name',
+                               'ingredient__measurement_unit')
+                       .annotate(total=Sum('amount')))
 
         content = 'Список покупок\n'
         for ingredient in ingredients:
-            row = f'{ingredient[1]} - {ingredient[2]} {ingredient[3]}.\n\n'
+            print(ingredient)
+            row = (f'{ingredient["ingredient__name"]} - {ingredient["total"]}'
+                   f' {ingredient["ingredient__measurement_unit"]}.\n')
             content += row
 
         response = HttpResponse(content, content_type='text/plain')
