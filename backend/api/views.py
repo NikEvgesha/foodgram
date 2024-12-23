@@ -29,8 +29,7 @@ class UserDetailViewSet(UserViewSet):
     @action(
         methods=['GET'],
         detail=False,
-        permission_classes=[IsAuthenticated, ],
-        url_name='me',
+        permission_classes=[IsAuthenticated, ]
     )
     def me(self, request, *args, **kwargs):
         return super().me(request, *args, **kwargs)
@@ -77,16 +76,11 @@ class UserDetailViewSet(UserViewSet):
     )
     def subscribe(self, request, id):
         author = get_object_or_404(User, id=id)
-        user = request.user
         if request.method == 'POST':
-            if Follow.objects.filter(user=user, author=author).exists():
-                return Response(
-                    'Вы уже подписаны на этого автора',
-                    status=status.HTTP_400_BAD_REQUEST)
             serializer = FollowAddSerializer(
                 author,
                 data=request.data,
-                context={'request': request})
+                context={"request": request})
             serializer.is_valid(raise_exception=True)
             Follow.objects.create(user=request.user, author=author)
             return Response(
@@ -99,8 +93,7 @@ class UserDetailViewSet(UserViewSet):
             return Response(
                 'Такой подписки не существует',
                 status=status.HTTP_400_BAD_REQUEST)
-        get_object_or_404(
-            Follow,
+        Follow.objects.get(
             user=request.user,
             author=author).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -237,9 +230,8 @@ class RecipeViewSet(mixins.CreateModelMixin,
 
         content = 'Список покупок\n'
         for ingredient in ingredients:
-            print(ingredient)
-            row = (f'{ingredient["ingredient__name"]} - {ingredient["total"]}'
-                   f' {ingredient["ingredient__measurement_unit"]}.\n')
+            row = (f"{ingredient['ingredient__name']} - {ingredient['total']}"
+                   f" {ingredient['ingredient__measurement_unit']}.\n")
             content += row
 
         response = HttpResponse(content, content_type='text/plain')
