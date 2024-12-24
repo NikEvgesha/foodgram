@@ -93,7 +93,7 @@ class UserDetailViewSet(UserViewSet):
             return Response(
                 'Такой подписки не существует',
                 status=status.HTTP_400_BAD_REQUEST)
-        Follow.objects.get(
+        Follow.objects.filter(
             user=request.user,
             author=author).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -137,6 +137,10 @@ class RecipeViewSet(mixins.CreateModelMixin,
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
+
+    def partial_update(self, request, *args, **kwargs):
+        kwargs['partial'] = False
+        return self.update(request, *args, **kwargs)
 
     @action(
         detail=True,

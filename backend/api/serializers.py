@@ -209,7 +209,7 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         model = Recipe
         fields = ('ingredients', 'author',
                   'tags', 'image', 'name',
-                  'text', 'cooking_time',)
+                  'text', 'cooking_time')
         read_only_fields = ('author',)
         extra_kwargs = {
             'ingredients': {'required': True, 'allow_blank': False},
@@ -217,28 +217,26 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
             'name': {'required': True, 'allow_blank': False},
             'text': {'required': True, 'allow_blank': False},
             'image': {'required': True, },
-            'cooking_time': {'required': True, },
+            'cooking_time': {'required': True, }
         }
 
     def validate_tags(self, data):
+        if len(data) == 0:
+            raise serializers.ValidationError('Выберите хотя бы 1 тег')
+
         if len(set(data)) != len(data):
             raise serializers.ValidationError('Теги должны быть уникальные')
         return data
 
     def validate_ingredients(self, data):
+        if len(data) == 0:
+            raise serializers.ValidationError('Добавьте хотя бы 1 ингредиент')
 
         unique = len(set([item['ingredient'] for item in data]))
         if (len(data) != unique):
             raise serializers.ValidationError(
                 'Ингредиенты не должны повторяться')
         return data
-
-    def validate(self, attrs):
-        if 'recipe_ingredient' not in attrs:
-            raise serializers.ValidationError('Добавьте хотя бы 1 ингредиент')
-        if 'tags' not in attrs:
-            raise serializers.ValidationError('Выберите хотя бы 1 тег')
-        return attrs
 
     def create(self, validated_data):
         image = validated_data.pop('image')
