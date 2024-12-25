@@ -176,14 +176,15 @@ class RecipeViewSet(mixins.CreateModelMixin,
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         recipe = get_object_or_404(Recipe, id=pk)
-        cart_obj = Cart.objects.filter(user=request.user, recipe=recipe)
-        if cart_obj.exists():
-            cart_obj.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        return Response(
-            {'errors': 'Рецепта нет в корзине покупок'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        deleted_count, _ = Cart.objects.filter(
+            user=request.user,
+            recipe=recipe).delete()
+        if deleted_count == 0:
+            return Response(
+                {'errors': 'Рецепта нет в корзине покупок'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
         detail=True,
@@ -205,14 +206,15 @@ class RecipeViewSet(mixins.CreateModelMixin,
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         recipe = get_object_or_404(Recipe, id=pk)
-        fav_obj = Favorite.objects.filter(user=request.user, recipe=recipe)
-        if fav_obj.exists():
-            fav_obj.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        return Response(
-            {'errors': 'Рецепта нет в списке избранного'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        deleted_count, _ = Favorite.objects.filter(
+            user=request.user,
+            recipe=recipe).delete()
+        if deleted_count == 0:
+            return Response(
+                {'errors': 'Рецепта нет в списке избранного'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
         detail=False,
