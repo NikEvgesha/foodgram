@@ -87,15 +87,13 @@ class UserDetailViewSet(UserViewSet):
                 serializer.data,
                 status=status.HTTP_201_CREATED)
 
-        if not Follow.objects.filter(
-                user=request.user,
-                author=author).exists():
+        deleted_count, _ = Follow.objects.filter(
+            user=request.user,
+            author=author).delete()
+        if deleted_count == 0:
             return Response(
                 'Такой подписки не существует',
                 status=status.HTTP_400_BAD_REQUEST)
-        Follow.objects.filter(
-            user=request.user,
-            author=author).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
